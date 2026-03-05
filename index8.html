@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicTrack - Public Issue Reporting</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .hidden-section { display: none; }
+        .map-container { height: 400px; width: 100%; border-radius: 0.5rem; z-index: 1; }
+        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
+        .status-Pending { background-color: #fef3c7; color: #d97706; }
+        .status-Verified { background-color: #dbeafe; color: #2563eb; }
+        .status-InProgress { background-color: #e0e7ff; color: #4338ca; }
+        .status-Resolved { background-color: #dcfce7; color: #15803d; }
+        
+        .timeline { border-left: 2px solid #e5e7eb; margin-left: 10px; padding-left: 20px; }
+        .timeline-item { position: relative; margin-bottom: 20px; }
+        .timeline-item::before { content: ''; position: absolute; left: -26px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: #9ca3af; }
+        .timeline-item.active::before { background: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2 cursor-pointer" onclick="showSection('home')">
+                <i class="fa-solid fa-city text-2xl text-blue-400"></i>
+                <h1 class="text-xl font-bold tracking-tight">CivicTrack</h1>
+            </div>
+            <div class="hidden md:flex space-x-6 text-sm font-medium">
+                <button onclick="showSection('home')" class="hover:text-blue-300 transition">Home</button>
+                <button onclick="showSection('report')" class="hover:text-blue-300 transition">Report Issue</button>
+                <button onclick="showSection('track')" class="hover:text-blue-300 transition">Track Status</button>
+                <button onclick="showSection('dashboard')" class="hover:text-blue-300 transition">Dashboard</button>
+                <button onclick="showSection('admin-login')" class="bg-blue-700 px-4 py-1.5 rounded-full hover:bg-blue-600 transition">Admin Portal</button>
+            </div>
+        </div>
+    </nav>
+
+    <section id="home" class="container mx-auto px-4 py-10">
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-extrabold text-gray-900 mb-4">Empower Your Neighborhood</h2>
+            <p class="text-lg text-gray-600 max-w-2xl mx-auto">See an issue? Report it. CivicTrack connects your civic concerns directly with local authorities.</p>
+            <div class="mt-8 space-x-4">
+                <button onclick="showSection('report')" class="bg-blue-600 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-blue-700 transition font-bold">Report an Issue</button>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 class="text-xl font-bold mb-4 flex items-center">
+                <i class="fa-solid fa-map-location-dot mr-2 text-blue-600"></i> Live Issue Map
+            </h3>
+            <div id="map" class="map-container border border-gray-200"></div>
+        </div>
+    </section>
+
+    <section id="report" class="hidden-section container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-xl">
+            <h2 class="text-2xl font-bold mb-6 text-blue-900 border-b pb-4">New Service Request</h2>
+            <form id="reportForm" onsubmit="handleReportSubmit(event)">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Full Name</label>
+                        <input type="text" id="name" required class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" id="phone" required class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">City</label>
+                        <select id="city" class="w-full border border-gray-300 rounded-lg p-2.5">
+                            <option value="Bangalore">Bangalore</option>
+                            <option value="Mysore">Mysore</option>
+                            <option value="Mangalore">Mangalore</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Issue Type</label>
+                        <select id="issueType" class="w-full border border-gray-300 rounded-lg p-2.5">
+                            <option value="Pothole">Pothole</option>
+                            <option value="Streetlight">Streetlight</option>
+                            <option value="Garbage">Garbage</option>
+                            <option value="Water Leak">Water Leak</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Area / Landmark</label>
+                    <input type="text" id="area" placeholder="e.g. Near Metro Station, Indiranagar" required class="w-full border border-gray-300 rounded-lg p-2.5">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                    <textarea id="description" rows="3" class="w-full border border-gray-300 rounded-lg p-2.5"></textarea>
+                </div>
+
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                    <button type="button" onclick="getLocation()" class="text-blue-700 font-bold hover:underline flex items-center">
+                        <i class="fa-solid fa-location-crosshairs mr-2"></i> Auto-Detect Location (GPS)
+                    </button>
+                    <input type="hidden" id="lat">
+                    <input type="hidden" id="lng">
+                    <p id="locationStatus" class="text-xs text-blue-600 mt-2 italic">Not captured (will use default city center if skipped)</p>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 shadow-lg transition duration-200">
+                    Submit Report
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <section id="track" class="hidden-section container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <div class="bg-white p-8 rounded-xl shadow-md mb-6">
+                <h2 class="text-2xl font-bold mb-4">Track Status</h2>
+                <div class="flex gap-2">
+                    <input type="text" id="trackIdInput" placeholder="Enter ID (e.g., CT-1234)" class="flex-1 border p-3 rounded-lg outline-none focus:border-blue-500">
+                    <button onclick="trackComplaint()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold">Track</button>
+                </div>
+            </div>
+            <div id="trackingResult" class="hidden bg-white p-8 rounded-xl shadow-lg"></div>
+        </div>
+    </section>
+
+    <section id="dashboard" class="hidden-section container mx-auto px-4 py-8">
+        <h2 class="text-3xl font-bold mb-8">City Transparency Dashboard</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+            <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-yellow-500">
+                <h3 class="text-gray-500 font-medium">Pending</h3>
+                <p class="text-3xl font-bold" id="dash-pending">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-blue-500">
+                <h3 class="text-gray-500 font-medium">In Progress</h3>
+                <p class="text-3xl font-bold" id="dash-progress">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-green-500">
+                <h3 class="text-gray-500 font-medium">Resolved</h3>
+                <p class="text-3xl font-bold" id="dash-resolved">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border-t-4 border-gray-800">
+                <h3 class="text-gray-500 font-medium">Total Reports</h3>
+                <p class="text-3xl font-bold" id="dash-total">0</p>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl shadow-sm">
+            <h3 class="text-xl font-bold mb-6">Department Efficiency</h3>
+            <div id="dept-stats" class="space-y-4"></div>
+        </div>
+    </section>
+
+    <section id="admin-login" class="hidden-section container mx-auto px-4 py-16">
+        <div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-2xl">
+            <div class="text-center mb-6">
+                <i class="fa-solid fa-lock text-4xl text-blue-900 mb-2"></i>
+                <h2 class="text-2xl font-bold">Internal Portal</h2>
+            </div>
+            <input type="password" id="adminPass" placeholder="Password (Hint: admin123)" class="w-full border p-3 mb-4 rounded-lg">
+            <button onclick="adminLogin()" class="w-full bg-blue-900 text-white py-3 rounded-lg font-bold hover:bg-black transition">Login</button>
+            <p id="loginError" class="text-red-500 text-sm mt-3 hidden text-center">Incorrect access code.</p>
+        </div>
+    </section>
+
+    <section id="admin-dashboard" class="hidden-section container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold">Official Management Console</h2>
+            <button onclick="logoutAdmin()" class="text-red-600 font-semibold hover:underline">Exit Admin</button>
+        </div>
+        <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="p-4 font-bold text-sm">ID</th>
+                        <th class="p-4 font-bold text-sm">Category</th>
+                        <th class="p-4 font-bold text-sm">Location</th>
+                        <th class="p-4 font-bold text-sm">Status</th>
+                        <th class="p-4 font-bold text-sm">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="adminTableBody" class="divide-y"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <div id="actionModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[100]">
+        <div class="bg-white p-6 rounded-xl w-96 shadow-2xl">
+            <h3 class="text-lg font-bold mb-4 border-b pb-2">Update Incident</h3>
+            <input type="hidden" id="modalComplaintId">
+            
+            <label class="block text-sm font-bold mb-2">Change Status</label>
+            <select id="modalStatus" class="w-full border p-2 rounded-lg mb-4">
+                <option value="Pending Verification">Pending Verification</option>
+                <option value="Verified">Verified</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+            </select>
+
+            <label class="block text-sm font-bold mb-2">Assign Department</label>
+            <select id="modalDept" class="w-full border p-2 rounded-lg mb-6">
+                <option value="BBMP">Municipal Corp (Roads)</option>
+                <option value="BESCOM">Electricity Board</option>
+                <option value="BWSSB">Water Supply</option>
+                <option value="Police">Traffic/Security</option>
+            </select>
+
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 font-medium">Cancel</button>
+                <button onclick="saveAdminAction()" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold">Update</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Data Store
+        let complaints = JSON.parse(localStorage.getItem('civicTrackData')) || [];
+        let map;
+
+        // Initialize Map
+        function initMap() {
+            if (map) return;
+            map = L.map('map').setView([12.9716, 77.5946], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            renderMarkers();
+        }
+
+        function renderMarkers() {
+            if (!map) return;
+            complaints.forEach(c => {
+                if (c.lat && c.lng) {
+                    L.marker([c.lat, c.lng]).addTo(map)
+                        .bindPopup(`<b>${c.issueType}</b><br>${c.area}<br>Status: ${c.status}`);
+                }
+            });
+        }
+
+        // Navigation
+        function showSection(sectionId) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden-section'));
+            document.getElementById(sectionId).classList.remove('hidden-section');
+            if (sectionId === 'home') setTimeout(initMap, 200);
+            if (sectionId === 'dashboard') updateDashboard();
+            if (sectionId === 'admin-dashboard') renderAdminTable();
+            window.scrollTo(0,0);
+        }
+
+        // Geolocation
+        function getLocation() {
+            const status = document.getElementById('locationStatus');
+            if (navigator.geolocation) {
+                status.innerText = "Accessing GPS...";
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        document.getElementById('lat').value = pos.coords.latitude;
+                        document.getElementById('lng').value = pos.coords.longitude;
+                        status.innerText = `📍 Captured: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+                    },
+                    () => { status.innerText = "Location access denied."; }
+                );
+            }
+        }
+
+        // Handle Report
+        function handleReportSubmit(e) {
+            e.preventDefault();
+            const id = "CT-" + Math.floor(1000 + Math.random() * 9000);
+            const newIssue = {
+                id,
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                city: document.getElementById('city').value,
+                issueType: document.getElementById('issueType').value,
+                area: document.getElementById('area').value,
+                desc: document.getElementById('description').value,
+                lat: parseFloat(document.getElementById('lat').value) || 12.97,
+                lng: parseFloat(document.getElementById('lng').value) || 77.59,
+                status: "Pending Verification",
+                dept: "Unassigned",
+                date: new Date().toLocaleDateString()
+            };
+
+            complaints.push(newIssue);
+            localStorage.setItem('civicTrackData', JSON.stringify(complaints));
+            alert(`Complaint Submitted!\nYour Tracking ID is: ${id}`);
+            e.target.reset();
+            showSection('home');
+        }
+
+        // Track
+        function trackComplaint() {
+            const id = document.getElementById('trackIdInput').value.trim();
+            const issue = complaints.find(c => c.id === id);
+            const resultDiv = document.getElementById('trackingResult');
+            
+            if (!issue) {
+                alert("ID not found!");
+                return;
+            }
+
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h3 class="text-2xl font-bold">${issue.issueType}</h3>
+                        <p class="text-gray-500">ID: ${issue.id} | Reported: ${issue.date}</p>
+                    </div>
+                    <span class="status-badge status-${issue.status.replace(/\s/g, '')}">${issue.status}</span>
+                </div>
+                <div class="timeline">
+                    <div class="timeline-item active">
+                        <p class="font-bold">Issue Reported</p>
+                        <p class="text-sm text-gray-500">System registered the complaint</p>
+                    </div>
+                    <div class="timeline-item ${issue.status !== 'Pending Verification' ? 'active' : ''}">
+                        <p class="font-bold">Verification</p>
+                        <p class="text-sm text-gray-500">${issue.status === 'Pending Verification' ? 'Waiting for staff' : 'Verified by Admin'}</p>
+                    </div>
+                    <div class="timeline-item ${issue.status === 'In Progress' || issue.status === 'Resolved' ? 'active' : ''}">
+                        <p class="font-bold">Department Action</p>
+                        <p class="text-sm text-gray-500">Assigned to: ${issue.dept}</p>
+                    </div>
+                    <div class="timeline-item ${issue.status === 'Resolved' ? 'active' : ''}">
+                        <p class="font-bold">Resolved</p>
+                        <p class="text-sm text-gray-500">Issue has been fixed</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Dashboard Stats
+        function updateDashboard() {
+            document.getElementById('dash-total').innerText = complaints.length;
+            document.getElementById('dash-pending').innerText = complaints.filter(c => c.status === 'Pending Verification').length;
+            document.getElementById('dash-progress').innerText = complaints.filter(c => c.status === 'In Progress').length;
+            document.getElementById('dash-resolved').innerText = complaints.filter(c => c.status === 'Resolved').length;
+
+            const depts = ["BBMP", "BESCOM", "BWSSB", "Police"];
+            let html = "";
+            depts.forEach(d => {
+                const count = complaints.filter(c => c.dept === d).length;
+                const pct = complaints.length > 0 ? (count / complaints.length) * 100 : 0;
+                html += `
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>${d}</span><span>${count} cases</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('dept-stats').innerHTML = html;
+        }
+
+        // Admin
+        function adminLogin() {
+            if (document.getElementById('adminPass').value === 'admin123') {
+                showSection('admin-dashboard');
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        }
+
+        function renderAdminTable() {
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = complaints.map(c => `
+                <tr>
+                    <td class="p-4 text-sm font-medium">${c.id}</td>
+                    <td class="p-4 text-sm">${c.issueType}</td>
+                    <td class="p-4 text-sm">${c.area}</td>
+                    <td class="p-4"><span class="status-badge status-${c.status.replace(/\s/g, '')}">${c.status}</span></td>
+                    <td class="p-4"><button onclick="openModal('${c.id}')" class="text-blue-600 font-bold hover:underline">Update</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function openModal(id) {
+            const issue = complaints.find(c => c.id === id);
+            document.getElementById('modalComplaintId').value = id;
+            document.getElementById('modalStatus').value = issue.status;
+            document.getElementById('modalDept').value = issue.dept === 'Unassigned' ? '' : issue.dept;
+            document.getElementById('actionModal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('actionModal').classList.add('hidden'); }
+
+        function saveAdminAction() {
+            const id = document.getElementById('modalComplaintId').value;
+            const index = complaints.findIndex(c => c.id === id);
+            complaints[index].status = document.getElementById('modalStatus').value;
+            complaints[index].dept = document.getElementById('modalDept').value;
+            localStorage.setItem('civicTrackData', JSON.stringify(complaints));
+            closeModal();
+            renderAdminTable();
+        }
+
+        function logoutAdmin() {
+            document.getElementById('adminPass').value = "";
+            showSection('home');
+        }
+
+        // Startup
+        window.onload = () => {
+            initMap();
+        };
+    </script>
+</body>
+</html>
